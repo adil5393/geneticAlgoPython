@@ -1,0 +1,1 @@
+createChildFromClasses(classProbs)
