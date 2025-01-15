@@ -1,7 +1,7 @@
 
 import createVariables as cv
 import random
-
+import copy
 def createOrderMaps(totalPeriodsPerSubject,cls):
     orderMaps = {}
     for i in range(cv.numberofperiods):
@@ -71,10 +71,12 @@ def createTimetable(ordersPerClass):
     for day in cv.days:
         timetable[day]={}
         for cls in ordersPerClass:
-                pick=random.randint(0,len(ordersPerClass[cls])-1)
-                order = ordersPerClass[cls][pick]
-                timetable[day][cls]=(order)
+            pick=random.randint(0,len(ordersPerClass[cls])-1)
+            order = ordersPerClass[cls][pick]
+            timetable[day][cls]=copy.copy(order)
     return timetable
+
+
 
 
 def swap(a,b):
@@ -100,10 +102,16 @@ def initializeStructure(population,rforce,classes=None):
     
 def scoreShouldBeofClassesAndPopulation(classes):
     scoresShouldbeOfClasses ={}
+    subPriorityScore = {}
+    distScore = {}
     for cls in classes:
-        scoresShouldbeOfClasses[cls]=scoreShouldbe(cls)[0]
+        scores = scoreShouldbe(cls)
+        subPriorityScore[cls] = sum(scores[2])
+        print(subPriorityScore)
+        scoresShouldbeOfClasses[cls]=scores[0]
+        distScore[cls] = sum(scores[3])
     scoreShouldbePopulation = sum(scoresShouldbeOfClasses.values())
-    return scoresShouldbeOfClasses, scoreShouldbePopulation
+    return scoresShouldbeOfClasses, scoreShouldbePopulation, subPriorityScore, distScore
 
 def getTeacherScores(cls):
     subPriorityTeacherScore=[ (cv.numberofperiods-1) for item in cv.subPriorityMap[cls].keys()]
@@ -130,26 +138,62 @@ def scoreShouldbe(cls):
     periodDistributionMap = periodDistributionScores(cls)
     periodDistributionScore = periodDistributionMap.values()
     score += sum(periodDistributionScore) + sum(subPrioritySubjectScrore) + teacheroverLapScore
-    return score, periodDistributionMap
+    
+    return score, periodDistributionMap, subPrioritySubjectScrore,periodDistributionScore
 
 
 def calcPriorityScore(cls,populationspace,popIndex):
     days = cv.days
     subjectTeacherClassMap = cv.subTeacherClassMap
-    totalPriorityScore = 0
-    for values in subjectTeacherClassMap[cls].values():
-        for subject in values:
-            prioriTyScore = 0
-            prirotyVal = cv.subPriorityMap[cls][subject]
-            for day in days: 
-                for subTeacher in populationspace[popIndex][day][cls]:
-                    if(subject == subTeacher.split("-")[1]):
-                        prioriTyScore += 1
-            if(prioriTyScore>prirotyVal):
-                prioriTyScore = prioriTyScore-prirotyVal
-            totalPriorityScore+=prioriTyScore 
+    while True:
+        totalPriorityScore = 0
+        priofirtyFix = {}
+        loss = False
+        for values in subjectTeacherClassMap[cls].values():
+            for subject in values:
+                prioriTyScore = 0
+                prLoss = 0
+                prirotyVal = cv.subPriorityMap[cls][subject]
+                for day in days: 
+                    for subTeacher in populationspace[popIndex][day][cls]:
+                        if(subject == subTeacher.split("-")[1]):
+                            prioriTyScore += 1
+                
+                prLoss = prioriTyScore - prirotyVal
+                if(prLoss > 0 or prLoss < 0):
+                    loss = True
+                    
+                for pair in cv.subjectTeacherPairs:
+                    if(pair.split("-")[1]==subject):
+                        priofirtyFix[pair] = prLoss
+                totalPriorityScore+=prioriTyScore
+        
+        if (loss) :
+            # display(populationspace[popIndex])
+            # print(priofirtyFix)
+            for k in priofirtyFix:
+                if(priofirtyFix[k]>0):
+                    for day in days:
+                        for i in range(len(populationspace[popIndex][day][cls])):
+                            if(populationspace[popIndex][day][cls][i]==k and priofirtyFix[k]>0):
+                                # print(day, priofirtyFix,i)  
+                                populationspace[popIndex][day][cls][i] = "-"
+                                priofirtyFix[k] -= 1
+            # print(priofirtyFix)
+            # display(populationspace[popIndex])
+            for k in priofirtyFix:
+                if(priofirtyFix[k]<0):
+                    for day in days:
+                        for i in range(len(populationspace[popIndex][day][cls])):
+                            if(populationspace[popIndex][day][cls][i]=="-" and priofirtyFix[k]<0):
+                                populationspace[popIndex][day][cls][i] = k
+                                priofirtyFix[k] += 1
+            # print(priofirtyFix)
+            # display(populationspace[popIndex])
+        if (not loss):
+            break
+    
     return(totalPriorityScore)
-
 
 def calcDistributionScore(cls,populationspace,popIndex):
     days = cv.days
@@ -224,7 +268,9 @@ def calcTeacherOverlapScore(populationspace, popIndex, classes, prnt=False):
     return overlapScoremap
 
 
-def calculatePopulationScores(population,populationspace,classes,prnt=False):
+def calculatePopulationScores(population,populationspace,classes,clsPriorityScores,distscore,prnt=False):
+    prScore = {}
+    DistScore = {}
     populationScoresMap ={}
     scoreOfClasses ={}
     scoreDistributionMap = {}
@@ -236,17 +282,27 @@ def calculatePopulationScores(population,populationspace,classes,prnt=False):
         for k,v in overLapscoresMap[popIndex].items():
             overlapScoreValuesMap[popIndex][k] = sum(v.values())
     for popIndex in range(population):
+        prScore[popIndex] = {}
         scoreOfClasses[popIndex] = {}
         scoreDistributionMap[popIndex] = {}
         totalscore = 0
         mpr = 0
         for cls in classes:       
             distributionDetail=calcDistributionScore(cls,populationspace,popIndex)
+            
             priorityScore = calcPriorityScore(cls,populationspace,popIndex)
+            priorityScore = priorityScore - abs(priorityScore-clsPriorityScores[cls])
+            
+            prScore[popIndex][cls] = priorityScore
+            
             distributionScore = distributionDetail[0]
-            scoreDistributionMap[popIndex][cls] = distributionDetail[1]            
+            distributionScore = distributionDetail[0] - abs(distributionScore-distscore[cls])
+            DistScore[cls] = distributionScore
+            scoreDistributionMap[popIndex][cls] = distributionDetail[1]    
+                    
             overlapLoss = overlapScoreValuesMap[popIndex][cls]
-            score = distributionScore + priorityScore -overlapLoss
+    
+            score = distributionScore +priorityScore -overlapLoss
             scoreOfClasses[popIndex][cls] = score
             totalscore += score
         populationScoresMap[popIndex]=totalscore
@@ -258,7 +314,7 @@ def calculatePopulationScores(population,populationspace,classes,prnt=False):
     for popIndex,popScore in populationScoresMap.items():
         if(popScore == minScore):
             minPopscoreMap = {popIndex:minScore}
-    return populationScoresMap,maxScore,minScore,scoreOfClasses,scoreDistributionMap,overLapscoresMap, overlapScoreValuesMap,maxPopscoreMap,minPopscoreMap
+    return populationScoresMap,maxScore,minScore,scoreOfClasses,scoreDistributionMap,overLapscoresMap, overlapScoreValuesMap,maxPopscoreMap,minPopscoreMap, prScore
         
     
 def getClassProbs(scoreoclasses,classes):

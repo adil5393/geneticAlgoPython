@@ -5,9 +5,9 @@ import random
 orders = orderPerClass(totalPeriodsPerSubject,classes)
 initialtimetable = [createTimetable(orders)]
 # from createPopulation import scoreShouldBeofClassesAndPopulation
-totalpopulation = 300
+totalpopulation = 100
 generations = 1000
-mutationRate = 0.05
+mutationRate = 0.01
 crossoverrate = 0.5
 
 
@@ -17,6 +17,10 @@ def createPopulation(totalPopulation,orders):
         timetable = createTimetable(orders)
         generation . append(timetable)
     return generation
+
+def createChildFromClasses2(classProbs, populaitonspace):
+    
+    pass
 def createChildFromClasses(classProbs,populationspace):
     newChild = {}
     for day in days:
@@ -30,8 +34,8 @@ def createChildFromClasses(classProbs,populationspace):
             else:
                 space = parents[1]
             newChild[day][cls] = populationspace[space][day][cls]
-                
     return newChild
+
 def createChildFromPopulation(populationprobabilityDistribution,populationspace):
     keys = populationprobabilityDistribution.keys()
     weights = populationprobabilityDistribution.values()
@@ -54,21 +58,20 @@ def mutate(timetable, mutation_rate):
                 timetable[day][cls] = random.sample(timetable[day][cls], len(timetable[day][cls]))
     return timetable
 
-
+scoresShouldbeOfClasses, scoreShouldbePopulation, clsPriorityScore, distScore =scoreShouldBeofClassesAndPopulation(classes)
 populationspace = createPopulation(totalpopulation,orders)
-populationScoresMap,maxPopScore,minPopScore,scoreOfClasses,scoreDistributionMap, overlapscoresMap,overlapScoreValuesMap,maxPopScoreMap,minPopScoreMap = calculatePopulationScores(totalpopulation,populationspace,classes)
+populationScoresMap,maxPopScore,minPopScore,scoreOfClasses,scoreDistributionMap, overlapscoresMap,overlapScoreValuesMap,maxPopScoreMap,minPopScoreMap, prScore = calculatePopulationScores(totalpopulation,populationspace,classes,clsPriorityScore,distScore)
 populationprobabilityDistribution=probabilityDistribution(totalpopulation,populationScoresMap)
-scoresShouldbeOfClasses, scoreShouldbePopulation =scoreShouldBeofClassesAndPopulation(classes)
 classProbs = getClassProbs(scoreOfClasses,classes)
 oldScore=frstScore = maxPopScore
-scoresShouldbeOfClasses, scoreShouldbePopulation =scoreShouldBeofClassesAndPopulation(classes)
+
 target = scoreShouldbePopulation
 genCount = 0
 while True:
     newGen = []
     while len(newGen)<totalpopulation:
         r= random.random()
-        if(r<=0.1):         
+        if(r<=0):         
             child = createChildFromPopulation(populationprobabilityDistribution,populationspace)
         else:
             child = createChildFromClasses(classProbs,populationspace)
@@ -76,19 +79,28 @@ while True:
         newGen.append(child)
     genCount+=1
     populationspace = newGen
-    populationScoresMap,maxPopScore,minPopScore,scoreOfClasses,scoreDistributionMap, overlapscoresMap,overlapScoreValuesMap,maxPopScoreMap,minPopScoreMap = calculatePopulationScores(totalpopulation,populationspace,classes)
+    if(genCount == 500):
+        print(genCount)
+        n =10
+        populationspace[:n] = createPopulation(n,orders)
+        genCount = 0
+    populationScoresMap,maxPopScore,minPopScore,scoreOfClasses,scoreDistributionMap, overlapscoresMap,overlapScoreValuesMap,maxPopScoreMap,minPopScoreMap, prScore = calculatePopulationScores(totalpopulation,populationspace,classes,clsPriorityScore,distScore)
     populationprobabilityDistribution=probabilityDistribution(totalpopulation,populationScoresMap)
     classProbs = getClassProbs(scoreOfClasses,classes)
+    # print(frstScore,maxPopScore,minPopScore,scoreShouldbePopulation)
     if(maxPopScore>oldScore ):
         oldScore = maxPopScore
         print(frstScore,maxPopScore,minPopScore,scoreShouldbePopulation,)
         genCount = 0
+    
     if(maxPopScore==target):
         break
+print(frstScore,maxPopScore,minPopScore,scoreShouldbePopulation)
 for k,v in populationScoresMap.items():
     if(v==maxPopScore):
         print(maxPopScore,scoreShouldbePopulation,k)
         print(overlapscoresMap[k])
+        print(prScore[k])
         display(populationspace[k])
         break
 for k,v in populationScoresMap.items():

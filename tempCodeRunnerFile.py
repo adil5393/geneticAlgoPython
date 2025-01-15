@@ -1,1 +1,1 @@
-createChildFromClasses(classProbs)
+print(frstScore,maxPopScore,minPopScore,scoreShouldbePopulation)
