@@ -82,10 +82,15 @@ def createTimetable(ordersPerClass):
 def swap(a,b):
     return (b,a)
 def display(timetable):
-    for key1 in timetable:
-        print(key1)
-        for key2 in timetable[key1]:
-            print(key2,timetable[key1][key2])
+    # for key1 in timetable:
+    #     print(key1)
+    #     for key2 in timetable[key1]:
+    #         print(key2,timetable[key1][key2])
+    for cls in cv.classes:
+        print(cls)
+        for day in cv.days:
+            print(timetable[day][cls])
+            
 def overLapScore(populationspace,population,classes,prnt=False):
     overLapScores = {}
     for popIndex in range(population):
@@ -107,7 +112,7 @@ def scoreShouldBeofClassesAndPopulation(classes):
     for cls in classes:
         scores = scoreShouldbe(cls)
         subPriorityScore[cls] = sum(scores[2])
-        print(subPriorityScore)
+        # print(subPriorityScore)
         scoresShouldbeOfClasses[cls]=scores[0]
         distScore[cls] = sum(scores[3])
     scoreShouldbePopulation = sum(scoresShouldbeOfClasses.values())
@@ -131,17 +136,18 @@ def periodDistributionScores(cls):
 
 def scoreShouldbe(cls):
     score=0
+    indexScore = len(cv.days)*cv.numberofperiods
     subPrioritySubjectScrore = cv.subPriorityMap[cls].values()
     teacheroverLapScore = (1*len(cv.classes)-1)*cv.numberofperiods*len(cv.days)
     #subPriorityTeacherScore = getTeacherScores(cls)
     #score = sum(subPrioritySubjectScrore) + sum(subPriorityTeacherScore)
     periodDistributionMap = periodDistributionScores(cls)
     periodDistributionScore = periodDistributionMap.values()
-    score += sum(periodDistributionScore) + sum(subPrioritySubjectScrore) + teacheroverLapScore
+    score += sum(periodDistributionScore) + teacheroverLapScore + indexScore #+ sum(subPrioritySubjectScrore) 
     
     return score, periodDistributionMap, subPrioritySubjectScrore,periodDistributionScore
 
-
+    
 def calcPriorityScore(cls,populationspace,popIndex):
     days = cv.days
     subjectTeacherClassMap = cv.subTeacherClassMap
@@ -153,8 +159,9 @@ def calcPriorityScore(cls,populationspace,popIndex):
             for subject in values:
                 prioriTyScore = 0
                 prLoss = 0
-                prirotyVal = cv.subPriorityMap[cls][subject]
+                prirotyVal = cv.subPriorityMap[cls].get(subject,0)
                 for day in days: 
+                    
                     for subTeacher in populationspace[popIndex][day][cls]:
                         if(subject == subTeacher.split("-")[1]):
                             prioriTyScore += 1
@@ -193,7 +200,8 @@ def calcPriorityScore(cls,populationspace,popIndex):
         if (not loss):
             break
     
-    return(totalPriorityScore)
+    return populationspace
+    
 
 def calcDistributionScore(cls,populationspace,popIndex):
     days = cv.days
@@ -220,6 +228,38 @@ def calcDistributionScore(cls,populationspace,popIndex):
                 distributionScoreList.append(dayCount/subCountNew)
     distributionScore = sum(distributionScoreList)
     return distributionScore,subjectDistributionMap
+
+def calcIndexScore(cls,populationspace,popindex):
+    totalScore = len(cv.days)*cv.numberofperiods
+    allColumns = []
+    for i in range (cv.numberofperiods):
+        column = []
+        for day in cv.days:
+            column.append(populationspace[popindex][day][cls][i].split("-")[1])
+        allColumns.append(column)
+    for column in allColumns:
+        subMap = copy.deepcopy(cv.subPriorityMap)
+        error = 0
+        for subject in subMap[cls]:
+            loop = True
+            if(subject in column):
+                while True:
+                    count = subMap[cls][subject]
+                    remainingPeriods = 0
+                    if(count <= len(cv.days)):
+                        loop = False
+                    remainingPeriods = 0
+                    while count > len(cv.days):
+                        remainingPeriods += count - len(cv.days)
+                        count = count -remainingPeriods
+                        subMap[cls][subject] = remainingPeriods
+                    actualcount = column.count(subject)
+                    error += count - actualcount
+                    # print(cls,subject, count,error,column)
+                    if(not loop):
+                        break
+        totalScore -= error
+    return totalScore
 
 def totalFitnessOfPopSpace(populationScoresMap):
     totalFitness = sum(populationScoresMap.values())
@@ -287,13 +327,17 @@ def calculatePopulationScores(population,populationspace,classes,clsPriorityScor
         scoreDistributionMap[popIndex] = {}
         totalscore = 0
         mpr = 0
-        for cls in classes:       
+        for cls in classes:
+            # priorityScore = calcPriorityScore(cls,populationspace,popIndex)
+            # priorityScore = priorityScore - abs(priorityScore-clsPriorityScores[cls])
+            
+            # prScore[popIndex][cls] = priorityScore
+            
+            indexScore = calcIndexScore(cls,populationspace,popIndex)
+            
             distributionDetail=calcDistributionScore(cls,populationspace,popIndex)
             
-            priorityScore = calcPriorityScore(cls,populationspace,popIndex)
-            priorityScore = priorityScore - abs(priorityScore-clsPriorityScores[cls])
             
-            prScore[popIndex][cls] = priorityScore
             
             distributionScore = distributionDetail[0]
             distributionScore = distributionDetail[0] - abs(distributionScore-distscore[cls])
@@ -302,7 +346,9 @@ def calculatePopulationScores(population,populationspace,classes,clsPriorityScor
                     
             overlapLoss = overlapScoreValuesMap[popIndex][cls]
     
-            score = distributionScore +priorityScore -overlapLoss
+            score = distributionScore  -overlapLoss + indexScore #+priorityScore
+            
+            # print(distributionScore,priorityScore,overlapLoss,indexScore,cls)
             scoreOfClasses[popIndex][cls] = score
             totalscore += score
         populationScoresMap[popIndex]=totalscore

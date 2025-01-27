@@ -1,16 +1,13 @@
-from createVariables import totalPeriodsPerSubject,classes,days,numberofperiods
+from createVariables import totalPeriodsPerSubject,classes,days,numberofperiods, totalpopulation,mutationRate
 import copy
-from utility import calculatePopulationScores,scoreShouldBeofClassesAndPopulation, display,orderPerClass,createTimetable,probabilityDistribution,getClassProbs
+from utility import calculatePopulationScores,scoreShouldBeofClassesAndPopulation, display,orderPerClass,createTimetable,probabilityDistribution,getClassProbs,calcPriorityScore
 import random
 orders = orderPerClass(totalPeriodsPerSubject,classes)
 initialtimetable = [createTimetable(orders)]
 # from createPopulation import scoreShouldBeofClassesAndPopulation
-totalpopulation = 100
-generations = 1000
-mutationRate = 0.01
-crossoverrate = 0.5
 
 
+stagnantscores = []
 def createPopulation(totalPopulation,orders):
     generation = []
     for i in range(totalPopulation):
@@ -18,9 +15,6 @@ def createPopulation(totalPopulation,orders):
         generation . append(timetable)
     return generation
 
-def createChildFromClasses2(classProbs, populaitonspace):
-    
-    pass
 def createChildFromClasses(classProbs,populationspace):
     newChild = {}
     for day in days:
@@ -33,29 +27,53 @@ def createChildFromClasses(classProbs,populationspace):
                 space = parents[0]
             else:
                 space = parents[1]
-            newChild[day][cls] = populationspace[space][day][cls]
+            newChild[day][cls] = copy.deepcopy(populationspace[space][day][cls])
     return newChild
 
-def createChildFromPopulation(populationprobabilityDistribution,populationspace):
-    keys = populationprobabilityDistribution.keys()
-    weights = populationprobabilityDistribution.values()
-    parents = random.choices(list(keys),list(weights),k=2)
-    parent1 = populationspace[parents[0]]
-    parent2 = populationspace[parents[1]]
-    crossoverpointday = random.randint(0,len(days)-1)
-    days1 = days[:crossoverpointday]
-    days2 = days[crossoverpointday:]
-    newchild = {}
+def createChildFromPopulation(classProbs,populationspace):
+    newChild = {}
+    for day in days:
+        newChild[day]={}
+        for cls in classes:
+            keys = list(classProbs[cls].keys())
+            weights = list(classProbs[cls].values())
+            parents = random.choices(keys,weights,k=2)
+            if(classProbs[cls][parents[0]]>classProbs[cls][parents[1]]):
+                space = parents[0]
+            else:
+                space = parents[1]
+            newChild[day] = copy.deepcopy(populationspace[space][day])
+            break
+    return newChild
+def createChildFromPeriods(populationprobabilityDistribution,populationspace):
+    newChild = {}
+    keys = list(populationprobabilityDistribution.keys())
+    weights = list(populationprobabilityDistribution.keys())
+    parents = random.choices(keys,weights,k=2)
+    pop1 = parents[0]
+    pop2 = parents[1]
+    crossoverpoint = random.randint(0,numberofperiods-1)
+    days1 = days[:crossoverpoint]
+    days2 = days[crossoverpoint:]
     for day in days1:
-        newchild[day] = copy.deepcopy(parent1[day])
+        newChild[day] = populationspace[pop1][day]
     for day in days2:
-        newchild[day] = copy.deepcopy(parent2[day])
-    return newchild
+        newChild[day] = populationspace[pop2][day]
+    return newChild
 def mutate(timetable, mutation_rate):
-    for day in timetable:
-        for cls in timetable[day]:
-            if random.random() < mutation_rate:
-                timetable[day][cls] = random.sample(timetable[day][cls], len(timetable[day][cls]))
+    r = random.random()
+    if(r<=0.5):
+        for day in timetable:
+            for cls in timetable[day]:
+                if random.random() < mutation_rate:
+                    timetable[day][cls] = random.sample(timetable[day][cls], len(timetable[day][cls]))
+    else:
+        p1 = random.randint(0,numberofperiods-1)
+        p2 = random.randint(0,numberofperiods-1)
+        for cls in classes:
+            if random.random()<mutation_rate:
+                for day in timetable:
+                    timetable[day][cls][p1],timetable[day][cls][p2] = timetable[day][cls][p2],timetable[day][cls][p1] 
     return timetable
 
 scoresShouldbeOfClasses, scoreShouldbePopulation, clsPriorityScore, distScore =scoreShouldBeofClassesAndPopulation(classes)
@@ -67,34 +85,46 @@ oldScore=frstScore = maxPopScore
 
 target = scoreShouldbePopulation
 genCount = 0
-while True:
-    newGen = []
-    while len(newGen)<totalpopulation:
-        r= random.random()
-        if(r<=0):         
-            child = createChildFromPopulation(populationprobabilityDistribution,populationspace)
-        else:
-            child = createChildFromClasses(classProbs,populationspace)
-        child = mutate(child,mutationRate)
-        newGen.append(child)
-    genCount+=1
-    populationspace = newGen
-    if(genCount == 500):
-        print(genCount)
-        n =10
-        populationspace[:n] = createPopulation(n,orders)
-        genCount = 0
-    populationScoresMap,maxPopScore,minPopScore,scoreOfClasses,scoreDistributionMap, overlapscoresMap,overlapScoreValuesMap,maxPopScoreMap,minPopScoreMap, prScore = calculatePopulationScores(totalpopulation,populationspace,classes,clsPriorityScore,distScore)
-    populationprobabilityDistribution=probabilityDistribution(totalpopulation,populationScoresMap)
-    classProbs = getClassProbs(scoreOfClasses,classes)
-    # print(frstScore,maxPopScore,minPopScore,scoreShouldbePopulation)
-    if(maxPopScore>oldScore ):
-        oldScore = maxPopScore
-        print(frstScore,maxPopScore,minPopScore,scoreShouldbePopulation,)
-        genCount = 0
+try:
+    while True:
+        newGen = []
+        while len(newGen)<totalpopulation:
+            r= random.random()
+            if(r<=0.3):         
+                child = createChildFromPopulation(classProbs,populationspace)
+            elif(0.3<r<0.9):
+                child = createChildFromClasses(classProbs,populationspace)
+            else:
+                child = createChildFromPeriods(populationprobabilityDistribution,populationspace)
+            child = mutate(child,mutationRate)
+            newGen.append(child)
+        genCount+=1
+        populationspace = newGen
+        for i in range(totalpopulation):
+            for cls in classes:
+                populationspace = calcPriorityScore(cls,populationspace,i)
+        if(genCount == 100):
+            print(genCount)
+            n =10
+            oldScore = 0
+            populationspace  = createPopulation(totalpopulation,orders)
+            stagnantscores.append(maxPopScore)
+            genCount = 0
+        populationScoresMap,maxPopScore,minPopScore,scoreOfClasses,scoreDistributionMap, overlapscoresMap,overlapScoreValuesMap,maxPopScoreMap,minPopScoreMap, prScore = calculatePopulationScores(totalpopulation,populationspace,classes,clsPriorityScore,distScore)
+        populationprobabilityDistribution=probabilityDistribution(totalpopulation,populationScoresMap)
+        classProbs = getClassProbs(scoreOfClasses,classes)
+        # print(frstScore,maxPopScore,minPopScore,scoreShouldbePopulation)
+        if(maxPopScore>oldScore ):
+            oldScore = maxPopScore
+            print(frstScore,maxPopScore,minPopScore,scoreShouldbePopulation,)
+            genCount = 0
+        
+            if(maxPopScore==target):
+                break
+except KeyboardInterrupt as e:
+    print(stagnantscores)
     
-    if(maxPopScore==target):
-        break
+
 print(frstScore,maxPopScore,minPopScore,scoreShouldbePopulation)
 for k,v in populationScoresMap.items():
     if(v==maxPopScore):

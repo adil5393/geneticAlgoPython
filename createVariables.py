@@ -15,15 +15,22 @@ subTeacherClass
 nod
 '''
 
+
+
 classList=[classId["class"][item] for item in range(len(classId["class"]))]
 teachersList=[teacherid["teachers"][item] for item in range(len(teacherid["teachers"]))]
 days = ["monday","tuesday","wednesday","thursday","friday","saturday"]
 numberofperiods=int(nod["value"][0])
 subjectList=[subid["subject"][i] for i in range(len(subid["subject"]))]
 periodsperteacherperday=numberofperiods-1
-classes = None
+classes = ['1a','1b','2a','2b']
 if(classes == None):
     classes= classList
+    
+totalpopulation = 100
+generations = 1000
+mutationRate = 0.01
+crossoverrate = 0.5
 
 def createSubTeacherMap(subTeacher):
     subTeacherMap={}
@@ -102,8 +109,9 @@ def createSubTeacherClassMap():
         if(keys=="Subject"):
             continue
         for i in range(len(subTeacherClass[keys])):
-            if(subTeacherClass[keys][i] not in teachersList):
-                print(subTeacherClass[keys][i],keys,i,"Not Recognised- Please add them in Teacherid.csv")
+            if(not pd.isna(subTeacherClass[keys][i])):   
+                if(subTeacherClass[keys][i] not in teachersList):
+                    print(subTeacherClass[keys][i],keys,i,"Not Recognised- Please add them in Teacherid.csv")
                 
     for keys in subTeacherClass.keys():
         if(keys=="Subject"):
@@ -132,8 +140,6 @@ def createSubTeacherPairPerClass(subTeacherClassMap):
     return pairsPerClass
 
 
-import itertools
-
 def createAllPermutations(pairsPerClass, totalPeriodsPerSubject, numberofperiods, subjectClassList, classes):
     allPermutations = {}
     maxSubjects = {}
@@ -146,7 +152,7 @@ def createAllPermutations(pairsPerClass, totalPeriodsPerSubject, numberofperiods
     # Step 2: Calculate maximum periods per subject for each class
     for cls in classes:
         maxSubjects[cls] = {
-            subject: max(items[1] for items in totalPeriodsPerSubject[cls][subject]['days'])
+            subject: max((items[1] for items in totalPeriodsPerSubject[cls][subject]['days']),default=0)
             for subject in totalPeriodsPerSubject[cls]
         }
     
@@ -157,14 +163,12 @@ def createAllPermutations(pairsPerClass, totalPeriodsPerSubject, numberofperiods
             permGood=True
             for pair in pairsPerClass[cls]:
                 subject = pair.split("-")[1]
-                if(maxSubjects[cls][subject] < perm.count(pair)):
-                    permGood = False
-                    break
+                if(subject in maxSubjects[cls]):
+                    if(maxSubjects[cls][subject] < perm.count(pair)):
+                        permGood = False
+                        break
             if(permGood):
                 finalPermutations[cls].append(perm)
-                    
-                    
-
     return finalPermutations
 
 

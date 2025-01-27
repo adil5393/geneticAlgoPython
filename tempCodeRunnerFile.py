@@ -1,1 +1,1 @@
-print(frstScore,maxPopScore,minPopScore,scoreShouldbePopulation)
+populationprobabilityDistribution
